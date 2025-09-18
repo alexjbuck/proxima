@@ -1,0 +1,62 @@
+# Proxima Node Configuration
+
+[network]
+# Network addresses to listen on
+listen_addresses = ["127.0.0.1:0", "0.0.0.0:0"]
+
+# Bootstrap nodes for initial discovery
+bootstrap_nodes = [
+    "127.0.0.1:8080",
+    "127.0.0.1:8081"
+]
+
+# Maximum number of concurrent connections
+max_connections = 100
+
+# Connection timeout in seconds
+connection_timeout = 30
+
+[content]
+# Maximum content size in bytes (1MB)
+max_content_size = 1048576
+
+# Content time-to-live in seconds (1 hour)
+content_ttl = 3600
+
+# Content cache size
+cache_size = 10000
+
+[privacy]
+# Location precision in meters
+location_precision = 100.0
+
+# K-anonymity threshold
+k_anonymity = 5
+
+# Enable location mixing
+enable_mixing = true
+
+[routing]
+# Maximum hop distance in meters (10km)
+max_hop_distance = 10000.0
+
+# Maximum routing table size
+max_table_size = 10000
+
+# Route update interval in seconds
+update_interval = 30
+
+# Route time-to-live in seconds (5 minutes)
+route_ttl = 300
+
+# Maximum entries per geographic sector
+max_entries_per_sector = 100
+
+# Geographic decay factor for route costs
+geographic_decay_factor = 0.1
+
+# Social affinity weight in route cost calculation
+social_affinity_weight = 0.3
+
+# Staleness weight in route cost calculation
+staleness_weight = 0.2
