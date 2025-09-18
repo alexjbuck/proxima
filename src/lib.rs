@@ -1,30 +1,19 @@
 //! Proxima: A Decentralized Geographic Social Network
-//!
-//! This library implements a fundamentally geographic social network where physical location
-//! forms the primary organizing principle of the network topology.
-
-pub mod geo;
-pub mod content;
-pub mod utils;
-
-pub use geo::*;
-pub use content::*;
-pub use utils::*;
 
 /// Core error types for the Proxima network
 #[derive(thiserror::Error, Debug)]
 pub enum ProximaError {
     #[error("Geographic error: {0}")]
-    Geographic(#[from] geo::GeographicError),
+    Geographic(String),
     
     #[error("Content error: {0}")]
-    Content(#[from] content::ContentError),
-    
-    #[error("Serialization error: {0}")]
-    Serialization(#[from] bincode::Error),
+    Content(String),
     
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+    
+    #[error("Parse error: {0}")]
+    Parse(#[from] std::num::ParseFloatError),
     
     #[error("Configuration error: {0}")]
     Config(String),
@@ -34,71 +23,48 @@ pub type Result<T> = std::result::Result<T, ProximaError>;
 
 /// Main Proxima node implementation
 pub struct ProximaNode {
-    identity: NodeIdentity,
-    location: GeographicLocation,
-    content_manager: ContentManager,
+    id: String,
+    location: (f64, f64), // (latitude, longitude)
 }
 
 impl ProximaNode {
     /// Create a new Proxima node
-    pub async fn new(
-        location: GeographicLocation,
-        config: NodeConfig,
-    ) -> Result<Self> {
-        let identity = NodeIdentity::generate();
-        let content_manager = ContentManager::new(config.content.clone());
+    pub fn new(latitude: f64, longitude: f64) -> Result<Self> {
+        if !(-90.0..=90.0).contains(&latitude) || !(-180.0..=180.0).contains(&longitude) {
+            return Err(ProximaError::Geographic("Invalid coordinates".to_string()));
+        }
         
         Ok(Self {
-            identity,
-            location,
-            content_manager,
+            id: uuid::Uuid::new_v4().to_string(),
+            location: (latitude, longitude),
         })
     }
     
-    /// Start the node and begin participating in the network
-    pub async fn start(&mut self) -> Result<()> {
-        // Start content management
-        self.content_manager.start().await?;
-        
-        tracing::info!(
-            "Proxima node started at location: {}",
-            self.location
-        );
-        
-        Ok(())
+    /// Get the node ID
+    pub fn id(&self) -> &str {
+        &self.id
     }
     
-    /// Publish content to the network
-    pub async fn publish_content(&mut self, content: Content) -> Result<ContentId> {
-        let content_id = self.content_manager.publish(content).await?;
-        Ok(content_id)
+    /// Get the node location
+    pub fn location(&self) -> (f64, f64) {
+        self.location
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_node_creation() {
+        let node = ProximaNode::new(37.7749, -122.4194).unwrap();
+        assert!(!node.id().is_empty());
+        assert_eq!(node.location(), (37.7749, -122.4194));
     }
     
-    /// Get content relevant to current location
-    pub async fn get_local_content(&self, radius: f64) -> Result<Vec<Content>> {
-        self.content_manager.get_geographic_content(&self.location, radius).await
-    }
-}
-
-/// Configuration for a Proxima node
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct NodeConfig {
-    pub content: ContentConfig,
-}
-
-impl Default for NodeConfig {
-    fn default() -> Self {
-        Self {
-            content: ContentConfig::default(),
-        }
-    }
-}
-
-/// Load configuration from file
-impl NodeConfig {
-    pub fn load_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let content = std::fs::read_to_string(path)?;
-        let config: NodeConfig = toml::from_str(&content)?;
-        Ok(config)
+    #[test]
+    fn test_invalid_coordinates() {
+        let result = ProximaNode::new(91.0, 0.0);
+        assert!(result.is_err());
     }
 }
