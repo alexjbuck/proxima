@@ -1,6 +1,33 @@
 [package]
 name = "proxima"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
+# Geographic and spatial calculations
+geo = "0.28"
+geohash = "0.13"
+haversine = "0.3"
+spade = "2.0"
+
+# Data structures and algorithms
+ahash = "0.8"
+bit-vec = "0.6"
+crossbeam = "0.8"
+rayon = "1.8"
+
+# Serialization and networking
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+
+# Utilities
+anyhow = "1.0"
+thiserror = "1.0"
+log = "0.4"
+env_logger = "0.10"
+
+# Math and statistics
+nalgebra = "0.32"
+rand = "0.8"
+statrs = "0.16"
