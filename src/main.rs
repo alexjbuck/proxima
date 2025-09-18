@@ -66,7 +66,7 @@ async fn start_node(location_str: Option<String>) -> std::result::Result<(), Box
     
     info!("Proxima node started successfully!");
     info!("Node ID: {}", node.id());
-    info!("Node location: ({}, {})", lat, lon);
+    info!("Node location: {}", node.location());
     
     // Keep the node running
     tokio::signal::ctrl_c().await?;
@@ -83,27 +83,27 @@ async fn run_tests() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let node = ProximaNode::new(37.7749, -122.4194)?;
     info!("Created node with ID: {}", node.id());
     
-    // Test distance calculation (simple approximation)
+    // Test distance calculation
     let node2 = ProximaNode::new(37.7849, -122.4094)?;
-    let distance = calculate_distance(node.location(), node2.location());
+    let distance = node.distance_to(&node2);
     info!("Distance between nodes: {:.2} meters", distance);
+    
+    // Test content publishing
+    let mut node_with_content = ProximaNode::new(37.7749, -122.4194)?;
+    let location = GeographicLocation::new(37.7749, -122.4194, 10.0)?;
+    
+    let content = Content::new(
+        "test_user".to_string(),
+        ContentType::Text,
+        "Hello from Proxima!".as_bytes().to_vec(),
+        location,
+        vec!["demo".to_string()],
+    );
+    
+    let content_id = node_with_content.publish_content(content)?;
+    info!("Published content: {}", content_id);
+    info!("Node now has {} pieces of content", node_with_content.content_count());
     
     info!("All tests completed successfully!");
     Ok(())
-}
-
-/// Simple distance calculation (approximation)
-fn calculate_distance((lat1, lon1): (f64, f64), (lat2, lon2): (f64, f64)) -> f64 {
-    const EARTH_RADIUS: f64 = 6_371_000.0; // Earth's radius in meters
-    
-    let dlat = (lat2 - lat1).to_radians();
-    let dlon = (lon2 - lon1).to_radians();
-    
-    let a = (dlat / 2.0).sin().powi(2) + 
-            lat1.to_radians().cos() * lat2.to_radians().cos() * 
-            (dlon / 2.0).sin().powi(2);
-    
-    let c = 2.0 * a.sqrt().asin();
-    
-    EARTH_RADIUS * c
 }

@@ -2,6 +2,16 @@
 
 Proxima is a fundamentally geographic social network where physical location forms the primary organizing principle of the network topology. Unlike traditional social networks with geographic features added on top, Proxima uses spatial proximity as the core routing, discovery, and content distribution mechanism.
 
+## Current Status
+
+This is an early implementation of Proxima built with Rust. The current version includes:
+
+- ✅ **Geographic Types**: Multi-layer geographic addressing system
+- ✅ **Content Management**: Basic content publishing and retrieval
+- ✅ **Distance Calculations**: Haversine formula for accurate geographic distances
+- ✅ **Node Management**: Basic node creation and location tracking
+- ✅ **CLI Interface**: Command-line interface for testing and demonstration
+
 ## Core Philosophy: Geography-First Networking
 
 ### The Geographic Hypothesis
@@ -56,15 +66,6 @@ cargo run -- start
 
 # Start with custom location
 cargo run -- start --location "40.7128,-74.0060"
-
-# Start with custom configuration
-cargo run -- start --config config.toml
-```
-
-### Simulate a Network
-```bash
-# Simulate 20 nodes for 2 minutes
-cargo run -- simulate --nodes 20 --duration 120
 ```
 
 ### Run Tests
@@ -72,10 +73,19 @@ cargo run -- simulate --nodes 20 --duration 120
 # Run all tests
 cargo run -- test
 
-# Run specific test types
-cargo run -- test --test-type geographic
-cargo run -- test --test-type routing
-cargo run -- test --test-type content
+# Run unit tests
+cargo test
+```
+
+### Example Output
+```bash
+$ cargo run -- test
+2025-09-18T19:20:50.155682Z  INFO proxima: Running basic tests...
+2025-09-18T19:20:50.155731Z  INFO proxima: Created node with ID: b80a7c52-a53f-41e3-aa46-b824624d1581
+2025-09-18T19:20:50.155791Z  INFO proxima: Distance between nodes: 1417.33 meters
+2025-09-18T19:20:50.155819Z  INFO proxima: Published content: 5538d4f2-20cc-462b-bf86-a1b66fe106b8
+2025-09-18T19:20:50.155829Z  INFO proxima: Node now has 1 pieces of content
+2025-09-18T19:20:50.155837Z  INFO proxima: All tests completed successfully!
 ```
 
 ## Configuration

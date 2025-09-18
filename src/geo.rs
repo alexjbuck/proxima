@@ -1,8 +1,6 @@
-//! Geographic types and addressing system for Proxima
+//! Geographic types and utilities for Proxima
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use geohash::{encode, decode};
 use thiserror::Error;
 
 /// Geographic layers representing different scales of interaction
@@ -32,17 +30,6 @@ impl GeographicLayer {
         }
     }
     
-    /// Get the geohash precision needed for this layer
-    pub fn geohash_precision(&self) -> usize {
-        match self {
-            GeographicLayer::Hyperlocal => 7,  // ~150m
-            GeographicLayer::Neighborhood => 6, // ~600m
-            GeographicLayer::District => 5,     // ~2.4km
-            GeographicLayer::City => 4,         // ~20km
-            GeographicLayer::Region => 3,       // ~156km
-        }
-    }
-    
     /// Get all layers from most local to most global
     pub fn all_layers() -> Vec<GeographicLayer> {
         vec![
@@ -55,70 +42,11 @@ impl GeographicLayer {
     }
 }
 
-/// A geographic address for a node in the Proxima network
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct GeographicAddress {
-    /// Geohash representation of the location
-    pub geohash: String,
-    /// The geographic layer this address represents
-    pub layer: GeographicLayer,
-    /// Confidence in the location accuracy (0.0 to 1.0)
-    pub confidence: f64,
-    /// Timestamp when this location was last verified
-    pub timestamp: chrono::DateTime<chrono::Utc>,
-}
-
-impl GeographicAddress {
-    /// Create a new geographic address
-    pub fn new(
-        latitude: f64,
-        longitude: f64,
-        layer: GeographicLayer,
-        confidence: f64,
-    ) -> Result<Self, GeographicError> {
-        if !(-90.0..=90.0).contains(&latitude) || !(-180.0..=180.0).contains(&longitude) {
-            return Err(GeographicError::InvalidCoordinates { latitude, longitude });
-        }
-        
-        if !(0.0..=1.0).contains(&confidence) {
-            return Err(GeographicError::InvalidConfidence(confidence));
-        }
-        
-        let precision = layer.geohash_precision();
-        let geohash = encode(geo::Coord { x: longitude, y: latitude }, precision)
-            .map_err(|e| GeographicError::GeohashError(e.to_string()))?;
-        
-        Ok(Self {
-            geohash,
-            layer,
-            confidence,
-            timestamp: chrono::Utc::now(),
-        })
-    }
-    
-    /// Get the latitude and longitude from the geohash
-    pub fn coordinates(&self) -> Result<(f64, f64), GeographicError> {
-        let (coord, _, _) = decode(&self.geohash)
-            .map_err(|e| GeographicError::GeohashError(e.to_string()))?;
-        Ok((coord.y, coord.x))
-    }
-    
-    /// Calculate distance to another geographic address in meters
-    pub fn distance_to(&self, other: &GeographicAddress) -> Result<f64, GeographicError> {
-        let (lat1, lon1) = self.coordinates()?;
-        let (lat2, lon2) = other.coordinates()?;
-        
-        Ok(crate::utils::MathUtils::haversine_distance(lat1, lon1, lat2, lon2))
-    }
-}
-
-/// A geographic location with multiple layers of precision
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// A geographic location with precision information
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeographicLocation {
-    /// The precise location
-    pub coordinates: (f64, f64), // (latitude, longitude)
-    /// Addresses for different geographic layers
-    pub addresses: HashMap<GeographicLayer, GeographicAddress>,
+    /// The precise location (latitude, longitude)
+    pub coordinates: (f64, f64),
     /// Location uncertainty in meters
     pub uncertainty_meters: f64,
     /// Timestamp when location was last updated
@@ -132,25 +60,11 @@ impl GeographicLocation {
             return Err(GeographicError::InvalidCoordinates { latitude, longitude });
         }
         
-        let mut addresses = HashMap::new();
-        
-        // Create addresses for all layers
-        for layer in GeographicLayer::all_layers() {
-            let address = GeographicAddress::new(latitude, longitude, layer, 1.0 - (uncertainty_meters / 1000.0))?;
-            addresses.insert(layer, address);
-        }
-        
         Ok(Self {
             coordinates: (latitude, longitude),
-            addresses,
             uncertainty_meters,
             last_updated: chrono::Utc::now(),
         })
-    }
-    
-    /// Get the address for a specific geographic layer
-    pub fn address_for_layer(&self, layer: GeographicLayer) -> Option<&GeographicAddress> {
-        self.addresses.get(&layer)
     }
     
     /// Calculate distance to another location in meters
@@ -239,36 +153,11 @@ impl GeographicSector {
     }
 }
 
-/// Node identity information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NodeIdentity {
-    /// Unique node ID
-    pub id: String,
-    /// Node location
-    pub location: GeographicLocation,
-}
-
-impl NodeIdentity {
-    /// Generate a new node identity
-    pub fn generate() -> Self {
-        Self {
-            id: uuid::Uuid::new_v4().to_string(),
-            location: GeographicLocation::new(0.0, 0.0, 100.0).unwrap(),
-        }
-    }
-}
-
 /// Errors that can occur in geographic operations
 #[derive(Error, Debug)]
 pub enum GeographicError {
     #[error("Invalid coordinates: latitude={latitude}, longitude={longitude}")]
     InvalidCoordinates { latitude: f64, longitude: f64 },
-    
-    #[error("Invalid confidence value: {0} (must be between 0.0 and 1.0)")]
-    InvalidConfidence(f64),
-    
-    #[error("Geohash error: {0}")]
-    GeohashError(String),
     
     #[error("Distance calculation error: {0}")]
     DistanceError(String),
@@ -285,19 +174,10 @@ mod tests {
     use super::*;
     
     #[test]
-    fn test_geographic_address_creation() {
-        let address = GeographicAddress::new(37.7749, -122.4194, GeographicLayer::Neighborhood, 0.9).unwrap();
-        assert_eq!(address.layer, GeographicLayer::Neighborhood);
-        assert_eq!(address.confidence, 0.9);
-        assert!(!address.geohash.is_empty());
-    }
-    
-    #[test]
     fn test_geographic_location_creation() {
         let location = GeographicLocation::new(37.7749, -122.4194, 50.0).unwrap();
         assert_eq!(location.coordinates, (37.7749, -122.4194));
         assert_eq!(location.uncertainty_meters, 50.0);
-        assert_eq!(location.addresses.len(), 5); // All layers
     }
     
     #[test]
@@ -317,5 +197,16 @@ mod tests {
         
         let sector = GeographicSector::from_relative_location(&reference, &north);
         assert_eq!(sector, GeographicSector::North);
+    }
+    
+    #[test]
+    fn test_layer_for_distance() {
+        let location = GeographicLocation::new(37.7749, -122.4194, 10.0).unwrap();
+        
+        assert_eq!(location.layer_for_distance(50.0), GeographicLayer::Hyperlocal);
+        assert_eq!(location.layer_for_distance(500.0), GeographicLayer::Neighborhood);
+        assert_eq!(location.layer_for_distance(2000.0), GeographicLayer::District);
+        assert_eq!(location.layer_for_distance(10000.0), GeographicLayer::City);
+        assert_eq!(location.layer_for_distance(50000.0), GeographicLayer::Region);
     }
 }
